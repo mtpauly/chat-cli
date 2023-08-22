@@ -14,13 +14,13 @@ def get_cost(in_tok, out_tok, model):
     in_tok_1k = in_tok / 1000
     out_tok_1k = out_tok / 1000
     if model == "gpt-3.5-turbo":
-        return .15 * in_tok_1k + .2 * out_tok_1k
+        return .0015 * in_tok_1k + .002 * out_tok_1k
     if model == "gpt-3.5-turbo-16k":
-        return .3 * in_tok_1k + .4 * out_tok_1k
+        return .003 * in_tok_1k + .004 * out_tok_1k
     if model == "gpt-4":
-        return 3 * in_tok_1k + 6 * out_tok_1k
+        return .03 * in_tok_1k + .06 * out_tok_1k
     if model == "gpt-4-32k":
-        return 6 * in_tok_1k + 12 * out_tok_1k
+        return .06 * in_tok_1k + .12 * out_tok_1k
 
 
 def num_tokens_from_messages(messages, model="gpt-3.5-turbo-0613"):
@@ -64,6 +64,14 @@ def num_tokens_from_messages(messages, model="gpt-3.5-turbo-0613"):
     return num_tokens
 
 
+def get_metadata_str(tok, in_tok, out_tok, model, exec_time=None):
+    cost = get_cost(in_tok, out_tok, model)
+    if exec_time is not None:
+        return f"(tok={tok}, in={in_tok}, out={out_tok}, cost={cost:.4f}, time={exec_time:.1f})"
+    else:
+        return f"(tok={tok}, in={in_tok}, out={out_tok}, cost={cost:.4f})"
+
+
 ROLE_SYSTEM = "system"
 ROLE_ASSISTANT = "assistant"
 ROLE_USER = "user"
@@ -76,12 +84,12 @@ DEFAULT_SYSTEM_MESSAGE = """
         Explain your thinking and plan out your decisions, still being succinct and ensuring you don't use extra or unnecessary words.
         """.strip().replace("    ", "")
 
-model = "gpt-3.5-turbo"
-model = "gpt-4"
+MODELS = ["gpt-3.5-turbo", "gpt-3.5-turbo-16k", "gpt-4", "gpt-4-32k"]
 TEMPERATURE = 0
 STREAM = True
 
-MODELS = ["gpt-3.5-turbo", "gpt-3.5-turbo-16k", "gpt-4", "gpt-4-32k"]
+model = "gpt-3.5-turbo"
+# model = "gpt-4"
 
 if model not in MODELS:
     raise Exception(f"unknown model '{model}'")
@@ -95,12 +103,12 @@ total_out_tok = 0
 
 console = Console()
 
-console.print(f"[bold]System message:[/bold] {DEFAULT_SYSTEM_MESSAGE}")
-console.print("\n------------\n")
+console.print("------------ [0] SYSTEM ------------")
+console.print(f"\n{DEFAULT_SYSTEM_MESSAGE}\n")
 
 while True:
     try:
-        console.print("User: ", end="", style="bold")
+        console.print(f"------------ [{len(messages)}] USER ------------\n")
         user_input = input()
         if len(user_input) == 0:
             continue
@@ -110,9 +118,9 @@ while True:
         total_in_tok += in_tok
 
         console.print()
-        console.print("------------", end="")
-        console.print(f" (in_tok={in_tok})\n")
-        console.print("System: ", end="", style="bold")
+        console.print(get_metadata_str(in_tok, total_in_tok, total_out_tok, model))
+        console.print()
+        console.print(f"------------ [{len(messages)}] ASSISTANT ------------\n")
 
         response_start = time.time()
         if STREAM:
@@ -143,8 +151,8 @@ while True:
         total_out_tok += out_tok
 
         console.print()
-        console.print("------------", end="")
-        console.print(f" (out_tok={out_tok}, time={time.time() - response_start:.1f})\n")
+        console.print(get_metadata_str(out_tok, total_in_tok, total_out_tok, model, time.time() - response_start))
+        console.print()
 
         messages.append({
             "role": ROLE_ASSISTANT,
@@ -153,6 +161,4 @@ while True:
 
     except KeyboardInterrupt:
         console.print("\n\nUser exited")
-        cost = get_cost(total_in_tok, total_out_tok, model)
-        console.print(f"in_tok={total_in_tok}, out_tok={total_out_tok}, cost={cost:.2f}")
         sys.exit()
